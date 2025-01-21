@@ -1,5 +1,4 @@
 import sys
-
 import fire
 
 from human_eval_infilling.evaluation import evaluate_functional_correctness
@@ -19,7 +18,9 @@ def entry_point(
     :param benchmark_name: could be one of "single-line", "multi-line", "random-span", "random-span-light"
     """
     k = list(map(int, k.split(",")))
-    results = evaluate_functional_correctness(benchmark_name, sample_file, k, n_workers, timeout)
+    results = evaluate_functional_correctness(
+        benchmark_name, sample_file, k, n_workers, timeout
+    )
     print(results)
 
 
@@ -27,4 +28,5 @@ def main():
     fire.Fire(entry_point)
 
 
-sys.exit(main())
+if __name__ == "__main__":
+    sys.exit(main())
