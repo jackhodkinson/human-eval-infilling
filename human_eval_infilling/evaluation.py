@@ -1,7 +1,7 @@
 import itertools
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, Iterable, List, Union
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import tqdm
@@ -33,7 +33,9 @@ def estimate_pass_at_k(
         assert len(num_samples) == len(num_correct)
         num_samples_it = iter(num_samples)
 
-    return np.array([estimator(int(n), int(c), k) for n, c in zip(num_samples_it, num_correct)])
+    return np.array(
+        [estimator(int(n), int(c), k) for n, c in zip(num_samples_it, num_correct)]
+    )
 
 
 def evaluate_functional_correctness(
@@ -42,17 +44,18 @@ def evaluate_functional_correctness(
     k: List[int] = [1, 10, 100],
     n_workers: int = 4,
     timeout: float = 3.0,
-):
+    num_tasks: int = None,
+) -> Tuple[Dict[str, float], float]:
     """
     Evaluates the functional correctness of generated samples, and writes
     results to f"{sample_file}_results.jsonl.gz"
     """
 
     problems = read_problems(benchmark_name)
+    total_cost = 0.0
 
     # Check the generated samples against test suites.
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
-
         futures = []
         completion_id = Counter()
         n_samples = 0
@@ -62,13 +65,17 @@ def evaluate_functional_correctness(
         for sample in tqdm.tqdm(stream_jsonl(sample_file)):
             task_id = sample["task_id"]
             completion = sample["completion"]
+            cost = sample.get("cost", 0.0)
+            total_cost += cost
             args = (problems[task_id], completion, timeout, completion_id[task_id])
             future = executor.submit(check_correctness, *args)
             futures.append(future)
             completion_id[task_id] += 1
             n_samples += 1
 
-        assert len(completion_id) == len(problems), "Some problems are not attempted."
+        assert len(completion_id) == (
+            num_tasks if num_tasks is not None else len(problems)
+        ), "Some problems are not attempted."
 
         print("Running test suites...")
         for future in tqdm.tqdm(as_completed(futures), total=len(futures)):
@@ -87,7 +94,9 @@ def evaluate_functional_correctness(
 
     ks = k
     pass_at_k = {
-        f"pass@{k}": estimate_pass_at_k(total, correct, k).mean() for k in ks if (total >= k).all()
+        f"pass@{k}": estimate_pass_at_k(total, correct, k).mean()
+        for k in ks
+        if (total >= k).all()
     }
 
     # Finally, save the results in one file:
@@ -103,4 +112,4 @@ def evaluate_functional_correctness(
     print(f"Writing results to {out_file}...")
     write_jsonl(out_file, tqdm.tqdm(combine_results(), total=n_samples))
 
-    return pass_at_k
+    return pass_at_k, total_cost
