@@ -1,7 +1,7 @@
 import itertools
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Tuple, Union
+from typing import List, Union
 
 import numpy as np
 import tqdm
@@ -45,7 +45,7 @@ def evaluate_functional_correctness(
     n_workers: int = 4,
     timeout: float = 3.0,
     num_tasks: int = None,
-) -> Tuple[Dict[str, float], float]:
+):
     """
     Evaluates the functional correctness of generated samples, and writes
     results to f"{sample_file}_results.jsonl.gz"
@@ -53,6 +53,8 @@ def evaluate_functional_correctness(
 
     problems = read_problems(benchmark_name)
     total_cost = 0.0
+    total_input_tokens = 0
+    total_output_tokens = 0
 
     # Check the generated samples against test suites.
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
@@ -65,8 +67,15 @@ def evaluate_functional_correctness(
         for sample in tqdm.tqdm(stream_jsonl(sample_file)):
             task_id = sample["task_id"]
             completion = sample["completion"]
+
+            # Statistics
             cost = sample.get("cost", 0.0)
             total_cost += cost
+            input_tokens = sample.get("input_tokens", 0)
+            output_tokens = sample.get("output_tokens", 0)
+            total_input_tokens += input_tokens
+            total_output_tokens += output_tokens
+
             args = (problems[task_id], completion, timeout, completion_id[task_id])
             future = executor.submit(check_correctness, *args)
             futures.append(future)
@@ -112,4 +121,10 @@ def evaluate_functional_correctness(
     print(f"Writing results to {out_file}...")
     write_jsonl(out_file, tqdm.tqdm(combine_results(), total=n_samples))
 
-    return pass_at_k, total_cost
+    for k, v in pass_at_k.items():
+        print(f"{k}: {v}")
+    print(f"Total cost: {total_cost}")
+    print(f"Total input tokens: {total_input_tokens}")
+    print(f"Total output tokens: {total_output_tokens}")
+
+    return pass_at_k
