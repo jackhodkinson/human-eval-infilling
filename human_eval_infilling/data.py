@@ -5,15 +5,17 @@ from typing import Dict, Iterable
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
 
+BENCHMARK_NAME_TO_PATH = {
+    "single-line": os.path.join(ROOT, "HumanEval-SingleLineInfilling.jsonl.gz"),
+    "multi-line": os.path.join(ROOT, "HumanEval-MultiLineInfilling.jsonl.gz"),
+    "random-span": os.path.join(ROOT, "HumanEval-RandomSpan.jsonl.gz"),
+    "random-span-light": os.path.join(ROOT, "HumanEval-RandomSpanLight.jsonl.gz"),
+    "test": os.path.join(ROOT, "example_problem.jsonl"),
+}
+
 
 def read_problems(benchmark_name: str) -> Dict[str, Dict]:
-    benchmark_file = {
-        "single-line": os.path.join(ROOT, "HumanEval-SingleLineInfilling.jsonl.gz"),
-        "multi-line": os.path.join(ROOT, "HumanEval-MultiLineInfilling.jsonl.gz"),
-        "random-span": os.path.join(ROOT, "HumanEval-RandomSpan.jsonl.gz"),
-        "random-span-light": os.path.join(ROOT, "HumanEval-RandomSpanLight.jsonl.gz"),
-        "test": os.path.join(ROOT, "example_problem.jsonl"),
-    }[benchmark_name]
+    benchmark_file = BENCHMARK_NAME_TO_PATH[benchmark_name]
     return {task["task_id"]: task for task in stream_jsonl(benchmark_file)}
 
 
